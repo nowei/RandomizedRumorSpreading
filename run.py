@@ -44,10 +44,11 @@ class Node:
     #  - we can take the rumor and set it as our next_rumor
 
     def pull(self):
+        if self.rumor:
+            return 0
         if self.neighbor.rumor:
             self.next_rumor = self.neighbor.rumor
-            return 1
-        return 0
+        return 1
 
     def push(self):
         if self.rumor: 
@@ -57,6 +58,17 @@ class Node:
 
     def push_and_pull(self):
         val = 0
+        if self.rumor:
+            self.neighbor.next_rumor = self.rumor
+            val += 1
+        else: 
+            if self.neighbor.rumor:
+                self.next_rumor = self.neighbor.rumor
+            val += 1
+        return val
+
+    def median(self):
+        val = 0
         if self.rumor and self.neighbor.rumor:
             self.next_counters.append(self.counter)
             self.neighbor.next_counters.append(self.counter)
@@ -64,11 +76,14 @@ class Node:
         else:
             if self.rumor:
                 self.neighbor.next_rumor = self.rumor
+                if self.neighbor.counter >= self.t_max:
+                    self.next_counters.append(self.neighbor.counter)
                 val += 1
             elif self.neighbor.rumor:
                 self.next_rumor = self.neighbor.rumor
-                val += 1
+            val += 1
         return val
+
 
     def update_state(self):
         if not self.use_median:
@@ -78,7 +93,8 @@ class Node:
         else:
             if not self.rumor and self.next_rumor:
                 self.rumor = self.next_rumor
-                self.counter = 1
+                self.counter = 1 if not self.next_counters else self.next_counters[0]
+                self.next_counters = []
             elif self.rumor:
                 greater_or_eq = sum([v >= self.counter for v in self.next_counters])
                 lower = len(self.next_counters) - greater_or_eq
@@ -149,7 +165,7 @@ def plot_graphs_rounds(n, mapping, name, average=False):
                 for entry in mapping[scheme]:
                     x = entry['record']
                     y = range(1, len(x) + 1)
-                    plt.plot(x, y, color=colors[scheme])
+                    plt.plot(x, y, color=colors[scheme], alpha=0.5)
 
         else:
             x = mapping[scheme]['record']
@@ -160,6 +176,7 @@ def plot_graphs_rounds(n, mapping, name, average=False):
     plt.xlabel('# of knowledgeable nodes')
     plt.ylabel('round')
     plt.title(name.replace('_', ' '))
+    plt.tight_layout()
     plt.savefig('graphs/{}.png'.format(name))
     plt.close()
 
@@ -169,24 +186,25 @@ def plot_graphs_transmissions(n, mapping, name, average=False):
         if type(mapping[scheme]) == list:
             runs = len(mapping[scheme])
             if average:
+                top = 0 
                 counter = Counter()
+                entry_counter = Counter()
                 for entry in mapping[scheme]:
                     record = entry['transmissions']
-                    counter += Counter(record)
-                curr = 0
+                    for i, t in enumerate(record):
+                        counter[i] += t
+                        entry_counter[i] += 1
+                    top = max(top, len(entry['record']))
                 averaged_record = []
-
-                for i in range(max(counter)):
-                    if i in counter:
-                        curr += counter[i]
-                    averaged_record.append(curr / runs)
-                plt.plot(averaged_record, range(1, len(averaged_record) + 1), color=colors[scheme])
+                for i in range(top):
+                    averaged_record.append(counter[i] / entry_counter[i])
+                plt.plot(range(1, len(averaged_record) + 1), averaged_record, color=colors[scheme])
 
             else:
                 for entry in mapping[scheme]:
                     y = entry['transmissions']
                     x = range(1, len(y) + 1)
-                    plt.plot(x, y, color=colors[scheme])
+                    plt.plot(x, y, color=colors[scheme], alpha=0.5)
 
         else:
             x = mapping[scheme]['transmissions']
@@ -197,6 +215,7 @@ def plot_graphs_transmissions(n, mapping, name, average=False):
     plt.xlabel('rounds')
     plt.ylabel('transmissions')
     plt.title(name.replace('_', ' '))
+    plt.tight_layout()
     plt.savefig('graphs/{}.png'.format(name))
     plt.close()
 
@@ -215,12 +234,13 @@ def plot_histograms_rounds(mapping, name):
         histograms[scheme] = h
     bins = np.histogram(np.hstack([histograms[scheme] for scheme in histograms]), bins=20)[1]
     for scheme in histograms:
-        plt.hist(histograms[scheme], bins, color=colors[scheme])
+        plt.hist(histograms[scheme], bins, color=colors[scheme], alpha=0.5)
         legend_handles.append(mpatches.Patch(color=colors[scheme], label=scheme))
     plt.legend(handles=legend_handles)
     plt.xlabel('rounds')
     plt.ylabel('frequency')
     plt.title(name.replace('_', ' '))
+    plt.tight_layout()
     plt.savefig('graphs/{}.png'.format(name))
     plt.close()
 
@@ -238,12 +258,13 @@ def plot_histograms_transmissions(mapping, name):
         histograms[scheme] = h
     bins = np.histogram(np.hstack([histograms[scheme] for scheme in histograms]), bins=20)[1]
     for scheme in histograms:
-        plt.hist(histograms[scheme], bins, color=colors[scheme])
+        plt.hist(histograms[scheme], bins, color=colors[scheme], alpha=0.5)
         legend_handles.append(mpatches.Patch(color=colors[scheme], label=scheme))
     plt.legend(handles=legend_handles)
     plt.xlabel('transmissions')
     plt.ylabel('frequency')
     plt.title(name.replace('_', ' '))
+    plt.tight_layout()
     plt.savefig('graphs/{}.png'.format(name))
     plt.close()
 
@@ -307,7 +328,7 @@ def average_runs(n, runs=100):
 def main():
     n = 10000
     # run_singles(n)
-    average_runs(n, runs=200)
+    average_runs(n, runs=1000)
 
 if __name__ == '__main__':
     main()
